@@ -5,11 +5,14 @@
 //   SMTP_USER  - Hostinger mailbox that sends the email, e.g. quotes@unisontransportation.com
 //   SMTP_PASS  - that mailbox's password
 //   QUOTE_TO   - optional, inbox that receives requests (default below)
+//   QUOTE_SIG  - shared secret; each email carries X-Unison-Sig = HMAC-SHA256 of the
+//                fields so the inbox watcher can tell a real website lead from a spoof
 //   SMTP_HOST / SMTP_PORT - optional overrides (defaults: smtp.hostinger.com, 465 over SSL)
 
 import nodemailer from 'nodemailer';
+import { createHmac } from 'node:crypto';
 
-const DEFAULT_TO = 'Info@unisontransportation.com';
+const DEFAULT_TO = 'quotes@unisontransportation.com';
 
 const LIMITS = {
   name: 120, phone: 40, email: 200, occasion: 80, passengers: 4,
@@ -106,6 +109,13 @@ export async function POST(request) {
     </table>` : ''}
   </div>`;
 
+  // Signature over the exact field values in a fixed order. The watcher on the
+  // inbox recomputes it; an email without a valid signature is never treated as a lead.
+  const sigSecret = (process.env.QUOTE_SIG || '').trim();
+  const sigFields = ['name', 'phone', 'email', 'occasion', 'passengers', 'date', 'time', 'pickup', 'destination'];
+  const sigPayload = sigFields.map((k) => f[k]).join('\n');
+  const signature = sigSecret ? createHmac('sha256', sigSecret).update(sigPayload, 'utf8').digest('hex') : '';
+
   const port = Number(process.env.SMTP_PORT) || 465;
   const transporter = nodemailer.createTransport({
     host: process.env.SMTP_HOST || 'smtp.hostinger.com',
@@ -124,6 +134,7 @@ export async function POST(request) {
       to: process.env.QUOTE_TO || DEFAULT_TO,
       replyTo: { name: f.name, address: f.email },
       subject: `Quote request: ${f.occasion || 'Trip'} on ${f.date} (${f.name})`,
+      headers: signature ? { 'X-Unison-Sig': signature, 'X-Unison-Sig-Fields': sigFields.join(',') } : {},
       text,
       html,
     });

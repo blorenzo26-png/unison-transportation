@@ -31,7 +31,7 @@ const RATES = {
   vanFullDay: 1000,      // van, longer service days (up to 12 hrs)
   shortDayMaxHours: 5,
   driverHourly: 50,      // chauffeur, per hour
-  hotelPerNight: 150,    // chauffeur accommodations on overnight trips
+  hotelPerNight: 325,    // chauffeur hotel + meals per night, from GSA per diem (Nashville FY27: $230 lodging + $86 M&IE); actual hotel rate confirmed in the quote
   fuelPer110Miles: 100,  // est. fuel per travel day, per ~110 miles one-way (Nashville to Huntsville)
   minHours: 2,
   maxHours: 12,
@@ -47,7 +47,7 @@ function estimateTrip({ days, nights, miles }) {
     lines.push({ label: `Day ${i + 1} · Maybach Sprinter (${hours <= RATES.shortDayMaxHours ? 'up to ' + RATES.shortDayMaxHours : 'up to ' + RATES.maxHours} hrs)`, amount: van });
     lines.push({ label: `Day ${i + 1} · Chauffeur (${hours} hrs × ${money(RATES.driverHourly)})`, amount: hours * RATES.driverHourly });
   });
-  if (nights > 0) lines.push({ label: `Chauffeur accommodations (${nights} night${nights > 1 ? 's' : ''})`, amount: nights * RATES.hotelPerNight });
+  if (nights > 0) lines.push({ label: `Chauffeur hotel & meals (${nights} night${nights > 1 ? 's' : ''}, from ${money(RATES.hotelPerNight)})`, amount: nights * RATES.hotelPerNight });
   const fuelPerDay = Math.round((miles / 110) * RATES.fuelPer110Miles);
   if (fuelPerDay > 0) lines.push({ label: `Estimated fuel (${days.length} day${days.length > 1 ? 's' : ''})`, amount: fuelPerDay * days.length });
   const total = lines.reduce((s, l) => s + l.amount, 0);
@@ -534,7 +534,7 @@ const EXPERIENCES = [
   { tag: 'Corporate', title: 'Roadshows & Executive Travel', body: 'Six stops, one vehicle, zero stress. A mobile meeting room with a privacy partition for clients, teams and visiting executives.', occasion: 'Corporate', accent: 'from-twilight/40' },
   { tag: 'BNA', title: 'Airport Transfers', body: 'Nashville International arrivals and departures. Tell us your flight and we plan the pickup around it, with room for the whole group.', occasion: 'Airport transfer', accent: 'from-platinum/15' },
   { tag: 'Discretion', title: 'Artists & Athletes', body: 'Discreet movement for talent, entourage and VIP guests. Tinted privacy, a quiet chauffeur, and we never say who rode with us.', occasion: 'VIP / Talent', accent: 'from-gold/25' },
-  { tag: 'Out of Town', title: 'Nashville to Anywhere', body: 'Huntsville and other regional cities, day trips or overnight. Overnights add a flat ' + money(RATES.hotelPerNight) + ' a night for your chauffeur’s hotel. Nothing hidden.', occasion: 'Out-of-town trip', accent: 'from-sage/35' },
+  { tag: 'Out of Town', title: 'Nashville to Anywhere', body: 'Huntsville and other regional cities, day trips or overnight. Overnights add from ' + money(RATES.hotelPerNight) + ' a night for your chauffeur’s hotel and meals, confirmed in your quote. Nothing hidden.', occasion: 'Out-of-town trip', accent: 'from-sage/35' },
 ];
 
 function Experiences({ onPick }) {
@@ -609,7 +609,7 @@ function Rates({ trip, setTrip, onRequest }) {
     { k: 'Short service day', v: money(RATES.vanShortDay), s: `Maybach Sprinter, up to ${RATES.shortDayMaxHours} hours` },
     { k: 'Full service day', v: money(RATES.vanFullDay), s: `Maybach Sprinter, up to ${RATES.maxHours} hours` },
     { k: 'Chauffeur', v: money(RATES.driverHourly), s: 'per hour of service' },
-    { k: 'Chauffeur hotel', v: money(RATES.hotelPerNight), s: 'overnight trips, per night' },
+    { k: 'Chauffeur hotel & meals', v: 'from ' + money(RATES.hotelPerNight), s: 'overnight trips, per night, confirmed in your quote' },
   ];
 
   return (

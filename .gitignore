@@ -4,3 +4,4 @@ node_modules
 excalidraw.log
 uploads/
 .claude/
+dist

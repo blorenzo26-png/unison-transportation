@@ -62,7 +62,9 @@ export async function POST(request) {
     };
   }
 
-  const { SMTP_USER, SMTP_PASS } = process.env;
+  // Trim: stray spaces or line breaks from copy-pasting into Vercel break the login.
+  const SMTP_USER = (process.env.SMTP_USER || '').trim();
+  const SMTP_PASS = (process.env.SMTP_PASS || '').trim();
   if (!SMTP_USER || !SMTP_PASS) {
     console.error('quote: SMTP_USER / SMTP_PASS are not set');
     return json(503, { error: 'Online requests are temporarily unavailable.' });
@@ -126,7 +128,10 @@ export async function POST(request) {
       html,
     });
   } catch (err) {
-    console.error('quote: SMTP error', err && (err.code || err.message));
+    // Log the server's reply (never the password) so failures are diagnosable.
+    const raw = process.env.SMTP_USER || '';
+    console.error('quote: SMTP error', err && err.code, '|', err && (err.response || err.message), '|',
+      `user looks like an email: ${/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(SMTP_USER)}, user had extra spaces: ${raw !== raw.trim()}, pass had extra spaces: ${(process.env.SMTP_PASS || '') !== SMTP_PASS}`);
     return json(502, { error: 'We couldn’t send your request just now.' });
   }
 

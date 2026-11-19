@@ -39,6 +39,7 @@ const RATES = {
   maxHours: 12,
   maxDays: 5,
   gratuityPct: 20,       // chauffeur gratuity, its own line; removable if the guest tips in person (DJ, 2026-11-17)
+  peakPct: 25,           // Saturdays, holidays and major events: +25% on van + chauffeur (Brian, 2026-11-19)
   transferFlat: 650,     // point-to-point transfer within Nashville, all-in (DJ, 2026-11-17)
 };
 
@@ -54,6 +55,7 @@ const TERMS = [
   { k: 'Date changes', v: 'Free with 7 or more days’ notice, subject to availability.' },
   { k: 'Gratuity', v: `${RATES.gratuityPct}% for your chauffeur, shown as its own line. Rather tip in person? Tell us before the trip and we’ll remove it.` },
   { k: 'Transfers', v: `Airport and point-to-point transfers within Nashville are a flat ${money(RATES.transferFlat)} all-in, gratuity included. Over about 90 minutes door to door is booked hourly.` },
+  { k: 'Peak dates', v: `Saturdays, major holidays (New Year’s Eve and Day, Memorial Day, July 4th, Labor Day, Thanksgiving, Christmas Eve and Day) and big events like CMA Fest add ${RATES.peakPct}% to the vehicle and chauffeur. Transfers, fuel and hotel are not affected.` },
   { k: 'Waiting', v: '15 minutes free (60 at the airport from landing), then $50 per 15 minutes.' },
   { k: 'Extras', v: 'Extra stops are free. Parking and tolls at cost, and $250 if the cabin needs special cleaning.' },
   { k: 'Payment', v: 'By the QuickBooks invoice we send (card and the other methods it offers), or Zelle, Cash App, Venmo or Apple Pay.' },
@@ -66,13 +68,45 @@ function vanTier(hours) {
   return { amount: RATES.vanFullDay, label: `up to ${RATES.maxHours} hrs`, kind: 'full day' };
 }
 
-function estimateTrip({ days, nights, miles }) {
+/* Peak dates: every Saturday, these holidays, and major Nashville events.
+   Add event dates to PEAK_EVENTS as they are announced (YYYY-MM-DD). */
+const PEAK_EVENTS = [
+  ['2027-06-10', '2027-06-13', 'CMA Fest'],
+];
+const ymd = (d) => d.toISOString().slice(0, 10);
+const nthWeekday = (y, m, wd, n) => { // n-th weekday (0=Sun) of month m (0-based); n = -1 for the last
+  if (n > 0) { const d = new Date(Date.UTC(y, m, 1)); d.setUTCDate(1 + ((wd - d.getUTCDay() + 7) % 7) + (n - 1) * 7); return d; }
+  const d = new Date(Date.UTC(y, m + 1, 0)); d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() - wd + 7) % 7)); return d;
+};
+function holidayName(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00Z');
+  const y = d.getUTCFullYear(), md = dateStr.slice(5);
+  const fixed = { '01-01': 'New Year’s Day', '07-04': 'July 4th', '12-24': 'Christmas Eve', '12-25': 'Christmas Day', '12-31': 'New Year’s Eve' };
+  if (fixed[md]) return fixed[md];
+  if (ymd(nthWeekday(y, 4, 1, -1)) === dateStr) return 'Memorial Day';
+  if (ymd(nthWeekday(y, 8, 1, 1)) === dateStr) return 'Labor Day';
+  if (ymd(nthWeekday(y, 10, 4, 4)) === dateStr) return 'Thanksgiving';
+  const ev = PEAK_EVENTS.find(([a, b]) => dateStr >= a && dateStr <= b);
+  return ev ? ev[2] : null;
+}
+// Why a service day is peak ("Saturday", "Thanksgiving", "CMA Fest"), or null.
+function peakReason(startDate, dayIndex) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate || '')) return null;
+  const d = new Date(startDate + 'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate() + dayIndex);
+  const str = ymd(d);
+  return holidayName(str) || (d.getUTCDay() === 6 ? 'Saturday' : null);
+}
+
+function estimateTrip({ days, nights, miles, date }) {
   const lines = [];
   days.forEach((asked, i) => {
     const hours = Math.max(asked, RATES.minHours);
     const van = vanTier(hours);
     lines.push({ label: `Day ${i + 1} · Maybach Sprinter (${van.label})`, amount: van.amount });
     lines.push({ label: `Day ${i + 1} · Chauffeur (${hours} hrs × ${money(RATES.driverHourly)})`, amount: hours * RATES.driverHourly });
+    const peak = peakReason(date, i);
+    if (peak) lines.push({ label: `Day ${i + 1} · Peak rate, ${peak} (+${RATES.peakPct}%)`, amount: Math.round((van.amount + hours * RATES.driverHourly) * RATES.peakPct / 100) });
   });
   if (nights > 0) lines.push({ label: `Chauffeur hotel & meals (${nights} night${nights > 1 ? 's' : ''}, from ${money(RATES.hotelPerNight)})`, amount: nights * RATES.hotelPerNight });
   const fuelPerDay = Math.round((miles / 110) * RATES.fuelPer110Miles);
@@ -674,7 +708,7 @@ function Rates({ trip, setTrip, onRequest }) {
                     <button
                       key={ex.title}
                       type="button"
-                      onClick={() => setTrip({ ...ex.trip, days: [...ex.trip.days] })}
+                      onClick={() => setTrip({ ...ex.trip, date: trip.date, days: [...ex.trip.days] })}
                       className="text-xs px-3 py-1.5 rounded-full border border-white/15 text-champagne/80 hover:border-gold hover:text-gold transition-colors"
                     >
                       {ex.title}
@@ -684,13 +718,23 @@ function Rates({ trip, setTrip, onRequest }) {
               </div>
 
               <div className="mt-8 space-y-6">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <label htmlFor="trip-date" className="field-label !mb-0">Trip date <span className="normal-case tracking-normal text-champagne/40">(optional)</span></label>
+                    {trip.days.some((_, i) => peakReason(trip.date, i)) && (
+                      <span className="text-xs text-gold">Peak date · +{RATES.peakPct}%</span>
+                    )}
+                  </div>
+                  <input id="trip-date" type="date" value={trip.date || ''} onChange={(e) => setTrip({ ...trip, date: e.target.value })} className="field mt-3" />
+                </div>
+
                 <Stepper label="Service days" value={trip.days.length} min={1} max={RATES.maxDays} onChange={setDays} />
 
                 {trip.days.map((h, i) => (
                   <div key={i}>
                     <div className="flex items-center justify-between">
                       <label htmlFor={`hours-${i}`} className="field-label !mb-0">Day {i + 1} hours</label>
-                      <span className="text-sm text-white font-light">{h} hrs · <span className="text-champagne/60">{vanTier(h).kind}</span></span>
+                      <span className="text-sm text-white font-light">{h} hrs · <span className="text-champagne/60">{vanTier(h).kind}{peakReason(trip.date, i) ? ` · ${peakReason(trip.date, i)}` : ''}</span></span>
                     </div>
                     <input
                       id={`hours-${i}`}
@@ -772,7 +816,7 @@ function Rates({ trip, setTrip, onRequest }) {
                   </div>
                   <div className="text-right shrink-0">
                     <div className="text-3xl font-light text-white">{money(e.total)}</div>
-                    <button type="button" onClick={() => setTrip({ ...ex.trip, days: [...ex.trip.days] })} className="mt-1 text-xs text-gold nav-link">Load in estimator</button>
+                    <button type="button" onClick={() => setTrip({ ...ex.trip, date: trip.date, days: [...ex.trip.days] })} className="mt-1 text-xs text-gold nav-link">Load in estimator</button>
                   </div>
                 </div>
               </Reveal>
@@ -890,13 +934,13 @@ function describeTrip(trip) {
   const est = estimateTrip(trip);
   const days = trip.days.map((h, i) => `Day ${i + 1}: ${h} hrs`).join(', ');
   return {
-    summary: `${days}${trip.nights ? `, ${trip.nights} overnight` : ''}, ~${trip.miles} mi one way`,
+    summary: `${trip.date ? `From ${trip.date}: ` : ''}${days}${trip.nights ? `, ${trip.nights} overnight` : ''}, ~${trip.miles} mi one way`,
     total: est.total,
     lines: est.lines,
   };
 }
 
-function Reserve({ trip, occasion, setOccasion, includeEstimate, setIncludeEstimate }) {
+function Reserve({ trip, setTrip, occasion, setOccasion, includeEstimate, setIncludeEstimate }) {
   const [status, setStatus] = useState('idle'); // idle | sending | sent | error
   const [error, setError] = useState('');
   const tripInfo = describeTrip(trip);
@@ -1008,7 +1052,7 @@ function Reserve({ trip, occasion, setOccasion, includeEstimate, setIncludeEstim
                 </div>
                 <div>
                   <label htmlFor="date" className="field-label">Date</label>
-                  <input id="date" name="date" type="date" required min={today} className="field" />
+                  <input id="date" name="date" type="date" required min={today} className="field" value={trip.date || ''} onChange={(e) => setTrip({ ...trip, date: e.target.value })} />
                 </div>
                 <div>
                   <label htmlFor="time" className="field-label">Pickup time</label>
@@ -1127,7 +1171,7 @@ function MobileBar() {
 
 /* ---------- App ---------- */
 export default function App() {
-  const [trip, setTrip] = useState({ days: [5], nights: 0, miles: 15 });
+  const [trip, setTrip] = useState({ days: [5], nights: 0, miles: 15, date: '' });
   const [occasion, setOccasion] = useState(OCCASIONS[0]);
   const [includeEstimate, setIncludeEstimate] = useState(true);
 
@@ -1143,7 +1187,7 @@ export default function App() {
         <Rates trip={trip} setTrip={setTrip} onRequest={() => { setIncludeEstimate(true); goReserve(); }} />
         <Nashville />
         <PromiseSection />
-        <Reserve trip={trip} occasion={occasion} setOccasion={setOccasion} includeEstimate={includeEstimate} setIncludeEstimate={setIncludeEstimate} />
+        <Reserve trip={trip} setTrip={setTrip} occasion={occasion} setOccasion={setOccasion} includeEstimate={includeEstimate} setIncludeEstimate={setIncludeEstimate} />
       </main>
       <Footer />
       <MobileBar />

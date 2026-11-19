@@ -28,23 +28,32 @@ const BUSINESS = {
    ========================================================= */
 const RATES = {
   vanShortDay: 750,      // van, service days up to SHORT_DAY_MAX_HOURS
-  vanFullDay: 1000,      // van, longer service days (up to 12 hrs)
+  vanSixHour: 875,       // van, 6-hour day (smooths the step from a short to a full day)
+  vanFullDay: 1000,      // van, 7 to 12 hours
   shortDayMaxHours: 5,
   driverHourly: 50,      // chauffeur, per hour
   hotelPerNight: 325,    // chauffeur hotel + meals per night, from GSA per diem (Nashville FY27: $230 lodging + $86 M&IE); actual hotel rate confirmed in the quote
   fuelPer110Miles: 100,  // est. fuel per travel day, per ~110 miles one-way (Nashville to Huntsville)
-  minHours: 2,
+  minHours: 5,           // booking minimum; shorter trips are quoted by DJ on request
   maxHours: 12,
   maxDays: 5,
 };
 
 const money = (n) => '$' + Math.round(n).toLocaleString('en-US');
 
+// Van price and label for one service day.
+function vanTier(hours) {
+  if (hours <= RATES.shortDayMaxHours) return { amount: RATES.vanShortDay, label: `up to ${RATES.shortDayMaxHours} hrs`, kind: 'short day' };
+  if (hours === RATES.shortDayMaxHours + 1) return { amount: RATES.vanSixHour, label: `${hours} hrs`, kind: 'extended day' };
+  return { amount: RATES.vanFullDay, label: `up to ${RATES.maxHours} hrs`, kind: 'full day' };
+}
+
 function estimateTrip({ days, nights, miles }) {
   const lines = [];
-  days.forEach((hours, i) => {
-    const van = hours <= RATES.shortDayMaxHours ? RATES.vanShortDay : RATES.vanFullDay;
-    lines.push({ label: `Day ${i + 1} · Maybach Sprinter (${hours <= RATES.shortDayMaxHours ? 'up to ' + RATES.shortDayMaxHours : 'up to ' + RATES.maxHours} hrs)`, amount: van });
+  days.forEach((asked, i) => {
+    const hours = Math.max(asked, RATES.minHours);
+    const van = vanTier(hours);
+    lines.push({ label: `Day ${i + 1} · Maybach Sprinter (${van.label})`, amount: van.amount });
     lines.push({ label: `Day ${i + 1} · Chauffeur (${hours} hrs × ${money(RATES.driverHourly)})`, amount: hours * RATES.driverHourly });
   });
   if (nights > 0) lines.push({ label: `Chauffeur hotel & meals (${nights} night${nights > 1 ? 's' : ''}, from ${money(RATES.hotelPerNight)})`, amount: nights * RATES.hotelPerNight });
@@ -606,9 +615,9 @@ function Rates({ trip, setTrip, onRequest }) {
   };
 
   const rateCards = [
-    { k: 'Short service day', v: money(RATES.vanShortDay), s: `Maybach Sprinter, up to ${RATES.shortDayMaxHours} hours` },
-    { k: 'Full service day', v: money(RATES.vanFullDay), s: `Maybach Sprinter, up to ${RATES.maxHours} hours` },
-    { k: 'Chauffeur', v: money(RATES.driverHourly), s: 'per hour of service' },
+    { k: 'Short service day', v: money(RATES.vanShortDay), s: `Maybach Sprinter, ${RATES.minHours}-hour minimum` },
+    { k: 'Full service day', v: money(RATES.vanFullDay), s: `Maybach Sprinter, up to ${RATES.maxHours} hours (6 hours: ${money(RATES.vanSixHour)})` },
+    { k: 'Chauffeur', v: money(RATES.driverHourly), s: `per hour, ${RATES.minHours}-hour minimum` },
     { k: 'Chauffeur hotel & meals', v: 'from ' + money(RATES.hotelPerNight), s: 'overnight trips, per night, confirmed in your quote' },
   ];
 
@@ -660,7 +669,7 @@ function Rates({ trip, setTrip, onRequest }) {
                   <div key={i}>
                     <div className="flex items-center justify-between">
                       <label htmlFor={`hours-${i}`} className="field-label !mb-0">Day {i + 1} hours</label>
-                      <span className="text-sm text-white font-light">{h} hrs · <span className="text-champagne/60">{h <= RATES.shortDayMaxHours ? 'short day' : 'full day'}</span></span>
+                      <span className="text-sm text-white font-light">{h} hrs · <span className="text-champagne/60">{vanTier(h).kind}</span></span>
                     </div>
                     <input
                       id={`hours-${i}`}
@@ -691,6 +700,12 @@ function Rates({ trip, setTrip, onRequest }) {
                     <span className="absolute right-0">400 mi</span>
                   </div>
                 </div>
+
+                <p className="text-xs text-champagne/55 font-light leading-relaxed">
+                  Bookings start at {RATES.minHours} hours. Need less time? Email DJ at{' '}
+                  <a className="text-gold nav-link" href={`mailto:${BUSINESS.email}?subject=${encodeURIComponent('Short trip rate')}`}>{BUSINESS.email}</a>{' '}
+                  and he’ll quote a short-trip rate when the schedule allows.
+                </p>
               </div>
             </div>
           </Reveal>

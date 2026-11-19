@@ -37,9 +37,26 @@ const RATES = {
   minHours: 5,           // booking minimum; shorter trips are quoted by DJ on request
   maxHours: 12,
   maxDays: 5,
+  gratuityPct: 20,       // chauffeur gratuity, its own line; removable if the guest tips in person (DJ, 2026-11-17)
+  transferFlat: 650,     // point-to-point transfer within Nashville, all-in (DJ, 2026-11-17)
 };
 
+
+
 const money = (n) => '$' + Math.round(n).toLocaleString('en-US');
+
+/* Booking terms DJ confirmed on 2026-11-17 (same wording Carson uses in quotes). */
+const TERMS = [
+  { k: 'Deposit', v: '50% holds your date. The balance is settled before the trip.' },
+  { k: 'Cancellation', v: 'Cancel 7 or more days before pickup for a full deposit refund. Inside 7 days the deposit is non-refundable but can be moved once to another open date.' },
+  { k: 'Same day & no-shows', v: 'Charged in full. Holiday and major-event dates are non-refundable once booked.' },
+  { k: 'Date changes', v: 'Free with 7 or more days’ notice, subject to availability.' },
+  { k: 'Gratuity', v: `${RATES.gratuityPct}% for your chauffeur, shown as its own line. Rather tip in person? Tell us before the trip and we’ll remove it.` },
+  { k: 'Transfers', v: `Airport and point-to-point transfers within Nashville are a flat ${money(RATES.transferFlat)} all-in, gratuity included. Over about 90 minutes door to door is booked hourly.` },
+  { k: 'Waiting', v: '15 minutes free (60 at the airport from landing), then $50 per 15 minutes.' },
+  { k: 'Extras', v: 'Extra stops are free. Parking and tolls at cost, and $250 if the cabin needs special cleaning.' },
+  { k: 'Payment', v: 'By the QuickBooks invoice we send (card and the other methods it offers), or Zelle, Cash App, Venmo or Apple Pay.' },
+];
 
 // Van price and label for one service day.
 function vanTier(hours) {
@@ -59,6 +76,9 @@ function estimateTrip({ days, nights, miles }) {
   if (nights > 0) lines.push({ label: `Chauffeur hotel & meals (${nights} night${nights > 1 ? 's' : ''}, from ${money(RATES.hotelPerNight)})`, amount: nights * RATES.hotelPerNight });
   const fuelPerDay = Math.round((miles / 110) * RATES.fuelPer110Miles);
   if (fuelPerDay > 0) lines.push({ label: `Estimated fuel (${days.length} day${days.length > 1 ? 's' : ''})`, amount: fuelPerDay * days.length });
+  const subtotal = lines.reduce((s, l) => s + l.amount, 0);
+  // Same rule as Carson's quotes: 20% of the whole trip, its own line.
+  lines.push({ label: `Chauffeur gratuity (${RATES.gratuityPct}%, removable)`, amount: Math.round(subtotal * RATES.gratuityPct / 100) });
   const total = lines.reduce((s, l) => s + l.amount, 0);
   return { lines, total };
 }
@@ -702,7 +722,8 @@ function Rates({ trip, setTrip, onRequest }) {
                 </div>
 
                 <p className="text-xs text-champagne/55 font-light leading-relaxed">
-                  Bookings start at {RATES.minHours} hours. Need less time? Email DJ at{' '}
+                  Bookings start at {RATES.minHours} hours. Just a ride from the airport or to a venue? Transfers within
+                  Nashville are a flat {money(RATES.transferFlat)}, gratuity included. Other short trips: email DJ at{' '}
                   <a className="text-gold nav-link" href={`mailto:${BUSINESS.email}?subject=${encodeURIComponent('Short trip rate')}`}>{BUSINESS.email}</a>{' '}
                   and he’ll quote a short-trip rate when the schedule allows.
                 </p>
@@ -725,8 +746,9 @@ function Rates({ trip, setTrip, onRequest }) {
               </ul>
               <div className="flex-1" />
               <p className="mt-6 text-xs text-champagne/45 font-light leading-relaxed">
-                An estimate, not a final quote. Fuel is estimated up front, and we confirm
-                the final price with you before anything is booked.
+                An estimate, not a final quote. Fuel is estimated up front, parking and tolls are
+                at cost, and we confirm the final price with you before anything is booked.
+                A 50% deposit holds your date.
               </p>
               <button type="button" onClick={onRequest} className="cta-primary mt-6 px-6 py-3 rounded-lg text-sm font-medium tracking-wide inline-flex items-center justify-center gap-2">
                 Request this quote <Icon d={icons.arrow} className="w-4 h-4" />
@@ -756,6 +778,21 @@ function Rates({ trip, setTrip, onRequest }) {
             );
           })}
         </div>
+
+        {/* Booking terms */}
+        <Reveal>
+          <div id="terms" className="mt-6 card rounded-2xl p-6 md:p-8">
+            <h3 className="text-xl font-medium text-white">Booking terms</h3>
+            <dl className="mt-6 grid sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-5 text-sm">
+              {TERMS.map((t) => (
+                <div key={t.k}>
+                  <dt className="text-[10px] tracking-[0.25em] uppercase text-gold">{t.k}</dt>
+                  <dd className="mt-1.5 text-champagne/70 font-light leading-relaxed">{t.v}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        </Reveal>
       </div>
     </section>
   );

@@ -34,7 +34,7 @@ const RATES = {
   driverHourly: 50,      // chauffeur, per hour
   hotelPerNight: 325,    // chauffeur hotel + meals per night, from GSA per diem (Nashville FY27: $230 lodging + $86 M&IE); actual hotel rate confirmed in the quote
   fuelPer110Miles: 100,  // est. fuel per travel day, per ~110 miles one-way (Nashville to Huntsville)
-  minHours: 5,           // booking minimum; shorter trips are quoted by DJ on request
+  minHours: 4,           // booking minimum; the short-day van block still covers up to 5 hours
   maxHours: 12,
   maxDays: 5,
   gratuityPct: 20,       // chauffeur gratuity, its own line; removable if the guest tips in person (DJ, 2026-11-17)
@@ -635,7 +635,7 @@ function Rates({ trip, setTrip, onRequest }) {
   };
 
   const rateCards = [
-    { k: 'Short service day', v: money(RATES.vanShortDay), s: `Maybach Sprinter, ${RATES.minHours}-hour minimum` },
+    { k: 'Short service day', v: money(RATES.vanShortDay), s: `Maybach Sprinter, up to ${RATES.shortDayMaxHours} hours` },
     { k: 'Full service day', v: money(RATES.vanFullDay), s: `Maybach Sprinter, up to ${RATES.maxHours} hours (6 hours: ${money(RATES.vanSixHour)})` },
     { k: 'Chauffeur', v: money(RATES.driverHourly), s: `per hour, ${RATES.minHours}-hour minimum` },
     { k: 'Chauffeur hotel & meals', v: 'from ' + money(RATES.hotelPerNight), s: 'overnight trips, per night, confirmed in your quote' },

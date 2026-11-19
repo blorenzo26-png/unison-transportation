@@ -14,7 +14,8 @@ const BUSINESS = {
   phoneHref: 'tel:+16292595327',
   email: 'Info@unisontransportation.com',
   mapsHref: 'https://www.google.com/maps/search/?api=1&query=1720+West+End+Avenue+Suite+320+Nashville+TN+37203',
-  capacity: 10,
+  capacity: 9,           // seats up to 9 guests in the back (DJ); say 8 comfortably
+  comfortable: 8,
   socials: [
     { name: 'Instagram', href: 'https://www.instagram.com/unisontransportation' },
     { name: 'TikTok',    href: 'https://www.tiktok.com/@unisontransportation' },
@@ -351,7 +352,7 @@ function Hero() {
               />
               <FadeIn delay={800} duration={1000}>
                 <p className="text-base md:text-lg text-champagne/80 mb-6 max-w-xl font-light">
-                  A chauffeured Mercedes-Maybach Sprinter for up to {BUSINESS.capacity} guests,
+                  A chauffeured Mercedes-Maybach Sprinter for up to {BUSINESS.capacity} guests ({BUSINESS.comfortable} ride comfortably),
                   with a discreet chauffeur who knows this city. For arrivals that
                   deserve more than a ride.
                 </p>
@@ -399,7 +400,7 @@ const VAN_FEATURES = [
   { icon: 'shield', title: 'Privacy partition', body: 'Raise the partition for a confidential call, a quiet moment, or a surprise.' },
   { icon: 'glass',  title: 'Refreshment console', body: 'A granite-topped console with an ice well and cup holders within reach of every seat.' },
   { icon: 'snow',   title: 'Rear cabin climate', body: 'Independent heat and air for the cabin, so the back stays comfortable on a July night.' },
-  { icon: 'people', title: `Up to ${BUSINESS.capacity} guests`, body: 'Everyone arrives together. No split cars, no surge pricing, no one left waiting on the curb.' },
+  { icon: 'people', title: `Up to ${BUSINESS.capacity} guests`, body: `${BUSINESS.comfortable} ride comfortably. Everyone arrives together. No split cars, no surge pricing, no one left waiting on the curb.` },
   { icon: 'wheel',  title: 'Professional chauffeur', body: 'Professional, discreet and punctual, and fluent in Nashville traffic, venues and back routes.' },
 ];
 
@@ -520,7 +521,7 @@ function TheVan() {
               <dl className="grid grid-cols-3 gap-4 text-center">
                 <div>
                   <dt className="text-[10px] tracking-[0.25em] uppercase text-champagne/50">Guests</dt>
-                  <dd className="mt-2 text-3xl md:text-4xl font-light text-white">{BUSINESS.capacity}</dd>
+                  <dd className="mt-2 text-3xl md:text-4xl font-light text-white">{BUSINESS.comfortable}–{BUSINESS.capacity}</dd>
                 </div>
                 <div className="border-x hairline">
                   <dt className="text-[10px] tracking-[0.25em] uppercase text-champagne/50">Private</dt>
